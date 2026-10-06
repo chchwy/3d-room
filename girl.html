@@ -389,36 +389,35 @@ const sweater = rbox(1.06,0.55,0.18,0.08, lilac, 0,1.68,0.46, chair); sweater.ro
 rbox(0.2,0.6,0.16,0.07, lilac, -0.45,1.25,0.5, chair).rotation.z = 0.15;
 rbox(0.2,0.6,0.16,0.07, lilac, 0.45,1.25,0.5, chair).rotation.z = -0.15;
 
-/* ---------- bookshelf (back-left corner) ---------- */
-const bsx = -4.5, bsz = -3.7, bw = 2.3, bd = 1.0, bh = 4.2;
-const shelfMat = white;
-box(bd, bh, 0.08, shelfMat, bsx, bh/2, bsz-bw/2+0.04);
-box(bd, bh, 0.08, shelfMat, bsx, bh/2, bsz+bw/2-0.04);
+/* ---------- 2x2 cube bookshelf (back-left corner) ---------- */
+const bsx = -4.5, bsz = -3.7, bw = 2.3, bd = 1.0, bh = 2.3;
+for(const z of [bsz-bw/2+0.04, bsz, bsz+bw/2-0.04]) box(bd, bh, 0.08, white, bsx, bh/2, z);
+for(const y of [0.04, bh/2, bh-0.04]) box(bd, 0.08, bw-0.16, white, bsx, y, bsz);
 box(0.04, bh-0.04, bw-0.16, std('#c9b7ef',0.8), -4.89, bh/2, bsz);  // kept clear of the wainscot and rail to avoid z-fighting
-const boards = [0.1, 1.45, 2.8, 4.16];
-boards.forEach(y=>box(bd, 0.08, bw-0.16, shelfMat, bsx, y, bsz));
-const zs = bsz-bw/2+0.12, ze = bsz+bw/2-0.12;
-for(let r=0;r<3;r++){
-  const y0 = boards[r]+0.04;
-  let z = zs;
-  const zEnd = r===1 ? ze-0.75 : ze;
+const cubby = [[bsz-bw/2+0.1, bsz-0.06],[bsz+0.06, bsz+bw/2-0.1]];   // z ranges of left / right column
+const rowY = [0.08, bh/2+0.04];                                        // shelf surface of bottom / top row
+function fillBooks(z0, z1, y0, maxH){
+  let z = z0;
   while(true){
-    const th = R(0.1,0.2); if(z+th > zEnd) break;
-    if(rand()<0.08){ z += 0.1; continue; }
-    const h = R(0.6,1.05), d = R(0.62,0.78);
+    const th = R(0.1,0.19); if(z+th > z1) break;
+    if(rand()<0.08){ z += 0.08; continue; }
+    const h = R(0.55, maxH), d = R(0.62,0.78);
     book(-4.06-d/2, y0+h/2, z+th/2, d, h, th-0.012, pick(kidCols));
     z += th;
   }
-  if(r===1){ const fb = book(-4.2, y0+0.5, ze-0.4, 0.06, 1.0, 0.7, '#ff8a7a'); fb.rotation.z = -0.18;
-    const coverTex = canvasTex(128,180,(c,W,H)=>{ c.fillStyle='#ff8a7a'; c.fillRect(0,0,W,H); c.fillStyle='#ffd25a'; c.beginPath(); c.arc(W/2,H*0.42,34,0,Math.PI*2); c.fill(); c.fillStyle='#fffaf0'; c.fillRect(20,H*0.75,W-40,10); c.fillRect(30,H*0.84,W-60,8); });
-    const cv = mesh(new THREE.PlaneGeometry(0.66,0.95), new THREE.MeshStandardMaterial({ map:coverTex, roughness:0.7 }), -4.165, y0+0.5, ze-0.4); cv.rotation.set(0,Math.PI/2,-0.18); cv.position.x += 0.005; }
 }
+// all four cubbies filled with books; one leans at the end of the top-left cubby
+fillBooks(cubby[0][0], cubby[0][1], rowY[0], 0.98);
+fillBooks(cubby[1][0], cubby[1][1], rowY[0], 0.98);
+fillBooks(cubby[0][0], cubby[0][1]-0.3, rowY[1], 0.95);
+const lean = book(-4.45, rowY[1]+0.42, cubby[0][1]-0.16, 0.7, 0.86, 0.14, '#ff8a7a'); lean.rotation.x = -0.32;
+fillBooks(cubby[1][0], cubby[1][1], rowY[1], 0.95);
 // jar of marbles on top (glass)
-cyl(0.22,0.22,0.5, glass, -4.5, 4.45, -4.2).castShadow = false;
-for(let i=0;i<22;i++) sph(0.055, std(pick(kidCols),0.15,0.1), -4.5+R(-0.13,0.13), 4.25+R(0,0.25), -4.2+R(-0.13,0.13));
-cyl(0.23,0.23,0.06, woodL, -4.5, 4.73, -4.2);
+cyl(0.22,0.22,0.5, glass, -4.5, bh+0.25, -4.2).castShadow = false;
+for(let i=0;i<22;i++) sph(0.055, std(pick(kidCols),0.15,0.1), -4.5+R(-0.13,0.13), bh+0.05+R(0,0.25), -4.2+R(-0.13,0.13));
+cyl(0.23,0.23,0.06, woodL, -4.5, bh+0.53, -4.2);
 // stuffed bunny on top
-const bunny = new THREE.Group(); bunny.position.set(-4.45,4.2,-3.2); bunny.rotation.y = 0.9; room.add(bunny);
+const bunny = new THREE.Group(); bunny.position.set(-4.45,bh,-3.2); bunny.rotation.y = 0.9; room.add(bunny);
 sph(0.26, pinkM, 0,0.24,0, bunny).scale.set(1,1.05,0.9);
 sph(0.19, pinkM, 0,0.6,0, bunny);
 for(const s of [-1,1]){ const e = sph(0.06, pinkM, s*0.08,0.88,0, bunny); e.scale.set(0.8,3,0.6); e.rotation.z = -s*0.15; }
