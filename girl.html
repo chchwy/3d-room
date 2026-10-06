@@ -461,8 +461,8 @@ for(const sx of [-1,1]) for(const sz of [-1,1]) cyl(0.08,0.07,0.15, woodL, bedX+
 rbox(bedW-0.06, 0.42, bedL-0.1, 0.16, white, bedX, 0.78, bedZ);
 rbox(bedW+0.04, 0.2, bedL*0.66, 0.09, new THREE.MeshStandardMaterial({ map:duvetTex, roughness:0.95 }), bedX+0.02, 1.04, bedZ+bedL*0.16);
 rbox(bedW+0.06, 0.24, 0.42, 0.11, std('#ffffff',0.95), bedX+0.02, 1.08, bedZ-bedL*0.16-0.04);
-rbox(1.05,0.3,0.6,0.14, std('#fff3f6',0.95), bedX-0.55, 1.16, bedZ-bedL/2+0.5).rotation.z = 0.05;
-rbox(0.95,0.28,0.56,0.13, std('#fff9e8',0.95), bedX+0.55, 1.14, bedZ-bedL/2+0.52).rotation.z = -0.06;
+// single bed: one pillow, centred
+rbox(1.45,0.32,0.66,0.15, std('#fff3f6',0.95), bedX, 1.17, bedZ-bedL/2+0.5).rotation.z = 0.03;
 // cloud headboard
 const hbZ = bedZ-bedL/2-0.12;
 rbox(bedW+0.1, 1.2, 0.22, 0.1, white, bedX, 1.0, hbZ);

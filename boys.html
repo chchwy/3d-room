@@ -488,8 +488,8 @@ const duvetTex = canvasTex(512,512,(c,W)=>{ c.fillStyle='#fbe9a8'; c.fillRect(0,
   c.strokeStyle='rgba(230,190,90,.35)'; c.lineWidth=3; for(let i=-W;i<W*2;i+=34){ c.beginPath(); c.moveTo(i,0); c.lineTo(i-W*0.5,W); c.stroke(); } });
 rbox(bedW+0.04, 0.2, bedL*0.66, 0.09, new THREE.MeshStandardMaterial({ map:duvetTex, roughness:0.95 }), bedX+0.02, frameH+0.56, bedZ+bedL*0.16);
 rbox(bedW+0.06, 0.24, 0.42, 0.11, std('#fff3c6',0.95), bedX+0.02, frameH+0.6, bedZ-bedL*0.16-0.04);
-rbox(1.05,0.3,0.6,0.14, std('#ffffff',0.95), bedX-0.55, frameH+0.68, bedZ-bedL/2+0.5).rotation.z = 0.05;
-rbox(0.95,0.28,0.56,0.13, std('#eaf4ff',0.95), bedX+0.55, frameH+0.66, bedZ-bedL/2+0.52).rotation.z = -0.06;
+// single bed: one pillow, centred
+rbox(1.45,0.32,0.66,0.15, std('#ffffff',0.95), bedX, frameH+0.69, bedZ-bedL/2+0.5).rotation.z = 0.03;
 const hbZ = bedZ-bedL/2-0.12;
 const hbF = geoMat(bedW+0.1, 1.5);
 mesh(new THREE.BoxGeometry(bedW+0.1, 1.5, 0.22), [fTop,fTop,fTop,fTop,hbF,hbF], bedX, 0.83, hbZ);
