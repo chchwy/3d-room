@@ -726,16 +726,14 @@ const skyMat = new THREE.ShaderMaterial({
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
     void main(){
       vec2 p = vP;
-      // sunset
-      vec3 s = mix(vec3(1.0,0.5,0.24), vec3(0.82,0.27,0.3), smoothstep(-1.5,0.5,p.y));
-      s = mix(s, vec3(0.24,0.1,0.3), smoothstep(0.5,2.4,p.y));
-      float d = length(p - vec2(-0.55,0.15));
-      s += vec3(1.0,0.5,0.22)*exp(-d*1.5)*0.75;
-      float cl = noise(vec2(p.x*0.9 + uTime*0.015, p.y*5.0)) * smoothstep(-0.4,0.5,p.y) * smoothstep(2.2,0.7,p.y);
-      s = mix(s, vec3(1.0,0.48,0.5), smoothstep(0.5,0.85,cl)*0.55);
-      vec3 sunC = mix(vec3(4.2,2.8,1.3), vec3(3.6,1.6,0.8), smoothstep(0.7,-0.4,p.y));
-      float band = step(0.4, fract((p.y-0.15)*9.0)) + step(0.0, p.y);
-      s = mix(s, sunC, smoothstep(0.52,0.49,d) * clamp(band,0.,1.));
+      // day: blue sky, a bright sun, a few drifting clouds
+      vec3 s = mix(vec3(0.6,0.8,1.0), vec3(0.13,0.36,0.86), smoothstep(-0.8,1.9,p.y));
+      float d = length(p - vec2(-1.05,1.12));
+      s += vec3(1.0,0.9,0.65)*exp(-d*2.4)*0.6;
+      float cl = noise(vec2(p.x*1.1 + uTime*0.02, p.y*3.2))*0.65 + noise(vec2(p.x*2.6 + uTime*0.03, p.y*6.5 + 3.0))*0.35;
+      cl *= smoothstep(0.1,0.7,p.y) * smoothstep(2.1,1.3,p.y);
+      s = mix(s, vec3(1.0,1.0,1.03), smoothstep(0.52,0.78,cl)*0.85);
+      s = mix(s, vec3(4.0,3.5,2.4), smoothstep(0.27,0.25,d));
       // night
       vec3 n = mix(vec3(0.12,0.12,0.36), vec3(0.03,0.04,0.16), smoothstep(-1.8,0.1,p.y));
       n = mix(n, vec3(0.008,0.008,0.03), smoothstep(0.1,2.3,p.y));
@@ -754,133 +752,42 @@ clipShader(skyMat);
 const sky = new THREE.Mesh(new THREE.PlaneGeometry(70,70), skyMat);
 sky.renderOrder = 2; scene.add(sky);
 
-// buildings: one instanced mesh, procedural facades
-const bMat = new THREE.ShaderMaterial({
-  uniforms:{ uMix:{value:0}, uTime:{value:0}, uWc:{value:Wc}, uDir:{value:dir} },
-  vertexShader:`
-    varying vec3 vW, vN, vS, vL;
-    void main(){
-      vL = position;
-      vec4 w = modelMatrix * instanceMatrix * vec4(position,1.);
-      vW = w.xyz;
-      vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
-      #ifdef USE_INSTANCING_COLOR
-        vS = instanceColor;
-      #else
-        vS = vec3(.5);
-      #endif
-      gl_Position = projectionMatrix * viewMatrix * w;
-    }`,
-  fragmentShader:`
-    uniform float uMix, uTime; uniform vec3 uWc, uDir;
-    varying vec3 vW, vN, vS, vL;
-    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-    void main(){
-      vec3 n = normalize(vN);
-      float side = step(abs(n.y), 0.5);
-      float depth = dot(vW - uWc, uDir);
-      float rel = vW.y - (uWc.y + uDir.y*depth);
-      bool fx = abs(n.x) > 0.5;
-      vec2 f = fx ? vec2(vW.z, vW.y) : vec2(vW.x, vW.y);
-      vec2 cs = vec2(0.34, 0.46);
-      vec2 id = floor(f/cs), g = fract(f/cs);
-      float wm = step(0.2,g.x)*step(g.x,0.8)*step(0.24,g.y)*step(g.y,0.76);
-      float r = h21(id + vS.r*173.1 + (fx?7.3:0.));
-      float r2 = h21(id*1.7 + vS.g*91.3);
-      float shade = fx ? 1.0 : 0.7;
-      // sunset: backlit silhouettes with amber windows
-      vec3 baseS = mix(vec3(0.07,0.035,0.08), vec3(0.14,0.07,0.11), vS.b) * shade;
-      vec3 winS = vec3(1.1,0.6,0.28)*(0.55+0.6*r2);
-      vec3 colS = mix(mix(vec3(0.26,0.12,0.16)*(0.6+0.4*vS.b), baseS, side), winS, side*wm*step(0.74,r));
-      // night: deep facades, mixed window colors, neon trims
-      vec3 baseN = mix(vec3(0.01,0.01,0.028), vec3(0.03,0.02,0.06), vS.b) * shade;
-      vec3 pal = r2 < 0.55 ? vec3(1.7,1.15,0.6) : r2 < 0.76 ? vec3(1.3,1.4,1.7) : r2 < 0.89 ? vec3(0.25,1.5,2.2) : vec3(2.2,0.35,1.5);
-      float flick = step(0.05, h21(id + floor(uTime*0.4 + r*20.)));
-      vec3 colN = mix(mix(vec3(0.05,0.03,0.09), baseN, side), pal*(0.6+0.5*r2), side*wm*step(0.48,r)*flick);
-      float u = fx ? vL.z : vL.x;
-      float edge = step(0.468, abs(u)) * step(0.7, vS.g) * side;
-      float crown = step(0.4988, vL.y) * step(0.42, vS.g) * side;  // ~0.1 world units on a 90-unit tower
-      float bands = step(0.97, fract(vL.y*45.0)) * step(0.93, vS.g) * side;
-      vec3 neon = vS.r > 0.5 ? vec3(0.4,1.6,2.8) : vec3(2.8,1.9,0.6);
-      float nm = max(max(edge, crown), bands);
-      colN = mix(colN, neon, nm);
-      colS = mix(colS, vec3(0.32,0.16,0.2), nm*0.6);
-      vec3 col = mix(colS, colN, uMix);
-      // atmospheric haze by distance + low-lying mist
-      float fd = smoothstep(14.0, 110.0, depth);
-      float fh = smoothstep(-0.6, -2.4, rel);
-      vec3 hazeS = mix(vec3(0.7,0.32,0.3), vec3(0.62,0.26,0.32), smoothstep(-2.0,1.0,rel));
-      vec3 hazeN = mix(vec3(0.05,0.06,0.18), vec3(0.03,0.04,0.12), smoothstep(-2.0,0.5,rel));
-      float fog = clamp(fd*0.5 + fh*(0.12+0.3*fd), 0., 0.85);
-      col = mix(col, mix(hazeS, hazeN, uMix), fog);
-      gl_FragColor = vec4(max(col, 0.0), 1.0);
-    }`,
-});
-clipShader(bMat);
-{
-  const N = 380;
-  const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1), bMat, N);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
-  for(let i=0;i<N;i++){
-    const t = 10 + Math.pow(rand(),1.25)*85;
-    const sx = R(-1,1)*(3.6 + t*0.1);
-    let sy, w = R(0.9,2.4), d = R(0.9,2.4);
-    const tower = t < 26 && Math.abs(sx) > 2.7 && rand() < 0.5;
-    if(tower){ sy = R(0.8,2.8); w = R(0.8,1.3); d = R(0.8,1.3); }
-    else if(t < 26) sy = R(-1.7,-0.35);
-    else if(t < 55) sy = R(-1.6,-0.15);
-    else sy = R(-1.7,-0.5);
-    const top = cityPoint(t, sx, sy);
-    const h = 90;
-    m4.compose(V(top.x, top.y-h/2, top.z), q, V(w,h,d));
-    city.setMatrixAt(i, m4);
-    city.setColorAt(i, col.setRGB(rand(), rand(), rand()));
-  }
-  city.renderOrder = 3; city.frustumCulled = false; scene.add(city);
-}
-
-// flying traffic lanes
-const carMat = clipBuiltin(new THREE.MeshBasicMaterial({ color:'#ffffff' }));
-const lanes = [];
-for(let l=0;l<6;l++) lanes.push({ t:R(11,50), sy:R(-1.3,1.5), dir: l%2 ? 1 : -1, speed:R(1.2,2.6) });
-const CARS_PER = 9, cars = [];
-const carMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5,0.045,0.045), carMat, lanes.length*CARS_PER);
-carMesh.renderOrder = 3; carMesh.frustumCulled = false;
-lanes.forEach((ln,li)=>{ for(let k=0;k<CARS_PER;k++){
-  const c = { ln, sx:R(-6,6), sp:ln.speed*R(0.85,1.15), dy:R(-0.06,0.06) };
-  cars.push(c);
-  carMesh.setColorAt(cars.length-1, C(ln.dir>0 ? pick(['#fff4d6','#ffffff','#9ff6ff']) : pick(['#ff3b4f','#ff6a3b','#ff3fa4'])));
-}});
-scene.add(carMesh);
-const carQ = new THREE.Quaternion().setFromAxisAngle(V(0,1,0), Math.PI/4);
-
-// holographic billboards
-const holoDraw = [
-  (g,W,Hh)=>{ g.strokeStyle='#ff4fb4'; g.lineWidth=10; g.shadowColor='#ff4fb4'; g.shadowBlur=24; g.beginPath(); g.arc(W/2,Hh/2,W*0.32,0,Math.PI*2); g.stroke(); g.beginPath(); g.arc(W/2,Hh/2,W*0.12,0,Math.PI*2); g.fillStyle='#ff9ad6'; g.fill(); },
-  (g,W,Hh)=>{ g.fillStyle='#3ff0ff'; g.shadowColor='#3ff0ff'; g.shadowBlur=18; for(let i=0;i<7;i++){ g.fillRect(W*0.2, Hh*0.1+i*Hh*0.115, W*(0.25+((i*37)%50)/100), Hh*0.06);} },
-  (g,W,Hh)=>{ g.strokeStyle='#ffd23f'; g.lineWidth=12; g.shadowColor='#ffb03f'; g.shadowBlur=24; g.beginPath(); g.moveTo(W/2,Hh*0.18); g.lineTo(W*0.82,Hh*0.8); g.lineTo(W*0.18,Hh*0.8); g.closePath(); g.stroke(); },
-  (g,W,Hh)=>{ g.strokeStyle='#7dffb5'; g.lineWidth=8; g.shadowColor='#3ff0ff'; g.shadowBlur=20; g.beginPath(); for(let x=0;x<=W;x+=4){ const y=Hh/2+Math.sin(x*0.06)*Hh*0.18*Math.sin(x*0.013); x?g.lineTo(x,y):g.moveTo(x,y);} g.stroke(); },
-];
-const holos = [];
-[[16,-2.6,0.9,1.0,1.4,0],[22,2.4,-0.1,0.9,0.6,1],[30,-0.6,-0.6,0.9,0.9,2],[13,-1.9,0.7,1.0,0.45,3],[40,3.0,-0.9,0.8,1.1,1],[26,-3.3,-0.4,0.7,0.7,0]].forEach(([t,sx,sy,w,h,k])=>{
-  const tex = canvasTex(256,256,(g,W,Hh)=>{ g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=3; g.strokeRect(8,8,W-16,Hh-16); holoDraw[k](g,W,Hh); });
-  const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
-  clipBuiltin(mat);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
-  m.position.copy(cityPoint(t,sx,sy)); m.lookAt(m.position.clone().add(baseDir)); m.frustumCulled = false;
-  scene.add(m); holos.push({ m, mat, ph:R(0,10) });
-});
-
-// hot-air balloons drifting over the city
-const balloonTex = canvasTex(256,128,(c,W,H)=>{ const cs=['#ff6b6b','#ffd25a','#6bcfd4','#fffaf0','#ff9ec4','#7cc4f2']; for(let i=0;i<12;i++){ c.fillStyle=cs[i%cs.length]; c.fillRect(i*W/12,0,W/12+1,H); } });
-const balloonMat = clipBuiltin(new THREE.MeshBasicMaterial({ map:balloonTex }));
-const basketMat = clipBuiltin(new THREE.MeshBasicMaterial({ color:'#8a5a3a' }));
-const balloons = [[14,-1.2,0.75,0.42],[24,1.6,1.05,0.32],[38,-2.4,0.2,0.26],[30,0.4,1.45,0.22]].map(([t,sx,sy,r],i)=>{
-  const g = new THREE.Group();
-  const env = new THREE.Mesh(new THREE.SphereGeometry(r,24,16), balloonMat); env.scale.set(1,1.15,1); env.position.y = r*0.9; g.add(env);
-  const bk = new THREE.Mesh(new THREE.BoxGeometry(r*0.4,r*0.3,r*0.4), basketMat); bk.position.y = -r*0.55; g.add(bk);
-  g.children.forEach(o=>o.frustumCulled=false); scene.add(g);
-  return { g, t, sx, sy, ph:i*1.7 };
+// mountains: two smooth peaks (light green behind, dark green in front), each a camera-facing plane at its own depth
+const mtnMix = { value:0 };
+const mtnVert = `varying vec2 vP; void main(){ vP=position.xy; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`;
+const mtnFrag = `
+  uniform float uMix, uC, uW, uPeak, uFoot, uSeed;
+  uniform vec3 uColD, uColN;
+  varying vec2 vP;
+  float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)) + uSeed)*43758.5453); }
+  float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+    return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
+  float ridge(float x){ return mix(uPeak, uFoot, smoothstep(0., uW, abs(x - uC))); }
+  void main(){
+    float below = ridge(vP.x) - vP.y;
+    float aa = fwidth(vP.y)*1.2;
+    float a = smoothstep(-aa, aa, below);
+    if(a < 0.002) discard;
+    float lit = vP.x < uC ? 1.06 : 0.9;                              // sun is to the upper left
+    float tex = 0.95 + 0.1*n2(vP*vec2(6.,8.));
+    float top = smoothstep(0.9, 0.0, below);                         // a little brighter toward the ridge
+    vec3 cD = uColD*lit*tex*(0.92 + 0.12*top);
+    vec3 cN = uColN*tex + vec3(0.05,0.07,0.16)*smoothstep(0.06, 0.0, below);  // moonlit rim
+    gl_FragColor = vec4(max(mix(cD, cN, uMix), 0.0), a);
+  }`;
+const mtnGeo = new THREE.PlaneGeometry(16, 6).translate(0, -1.5, 0);
+// back → front: [depth, center, half width, peak, day color, night color, seed]
+[[10,-0.6, 2.7, 0.45, '#8fd16a', '#18213f', 1.3],
+ [ 5, 1.4, 2.1,-0.15, '#2f7a34', '#0b131f', 7.1]].forEach(([t,c,w,peak,cd,cn,seed],i)=>{
+  const mat = clipShader(new THREE.ShaderMaterial({
+    uniforms:{ uMix:mtnMix, uC:{value:c}, uW:{value:w}, uPeak:{value:peak}, uFoot:{value:-2.3}, uSeed:{value:seed},
+      uColD:{value:C(cd)}, uColN:{value:C(cn)} },
+    vertexShader:mtnVert, fragmentShader:mtnFrag,
+    blending:THREE.CustomBlending, blendSrc:THREE.SrcAlphaFactor, blendDst:THREE.OneMinusSrcAlphaFactor, depthWrite:false,
+  }));
+  const m = new THREE.Mesh(mtnGeo, mat);
+  m.position.copy(cityPoint(t, 0, 0)); m.lookAt(m.position.clone().add(baseDir));
+  m.renderOrder = 3 + i; m.frustumCulled = false; scene.add(m);
 });
 
 /* ---------- post ---------- */
@@ -942,9 +849,7 @@ function applyMix(m, flick=1){
   wallMat.color.lerpColors(P.wall[0],P.wall[1],m);
   dustMat.color.lerpColors(P.dust[0],P.dust[1],m);
   for(const g of glows){ g.mat.color.lerpColors(g.a,g.b,m); if(g.neon && flick<1) g.mat.color.multiplyScalar(flick); }
-  carMat.color.setScalar(L(0.9,3.0,m));
-  balloonMat.color.setScalar(L(1.0,0.35,m));
-  skyMat.uniforms.uMix.value = m; bMat.uniforms.uMix.value = m;
+  skyMat.uniforms.uMix.value = m; mtnMix.value = m;
   if(Math.abs(m-lastBg) > 0.002){ drawBg(m); lastBg = m; }
 }
 
@@ -997,17 +902,7 @@ function tick(){
   camera.updateMatrixWorld(); updateWinQuad();
   sky.position.copy(Wc).addScaledVector(viewDir, 150); sky.quaternion.copy(camera.quaternion);
 
-  skyMat.uniforms.uTime.value = t; bMat.uniforms.uTime.value = t;
-
-  // traffic
-  cars.forEach((c,i)=>{
-    const lim = 4.5 + c.ln.t*0.1;
-    c.sx += c.ln.dir*c.sp*0.016*k; if(c.sx > lim) c.sx = -lim; if(c.sx < -lim) c.sx = lim;
-    const p = cityPoint(c.ln.t, c.sx, c.ln.sy + c.dy);
-    m4.compose(p, carQ, V(1,1,1)); carMesh.setMatrixAt(i, m4);
-  });
-  carMesh.instanceMatrix.needsUpdate = true;
-  holos.forEach(h=>{ const f = 0.85 + 0.15*Math.sin(t*9 + h.ph) * (Math.sin(t*0.7+h.ph) > 0.92 ? 3 : 1); h.mat.opacity = L(0.14, 0.95, mix)*Math.max(0.2,f); h.mat.color.setScalar(L(0.8,1.15,mix)); });
+  skyMat.uniforms.uTime.value = t;
 
   // life
   if(k){
@@ -1019,7 +914,6 @@ function tick(){
       else { d-=L1; x = lap.x0; z = lap.z0+d; ry = -Math.PI/2; }
       lapCar.position.set(x,0.03,z); lapCar.rotation.y = ry;
     }
-    balloons.forEach(b=>{ b.g.position.copy(cityPoint(b.t, b.sx + Math.sin(t*0.05+b.ph)*0.4, b.sy + Math.sin(t*0.6+b.ph)*0.06)); });
     leaves.forEach(l=>{ l.pivot.rotation.y = l.base + Math.sin(t*0.8 + l.ph)*0.04; });
     curtain.rotation.y = Math.sin(t*0.6)*0.03;
   }
